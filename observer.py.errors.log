@@ -1,0 +1,21 @@
+\n--- 2026-11-22 21:35:12 ---\nTraceback (most recent call last):
+  File "C:\AI\JARVIS\ComputerAwareness\observer.py", line 576, in do_POST
+    result = desktop_control(request["action"], request["args"])
+  File "C:\AI\JARVIS\ComputerAwareness\observer.py", line 495, in desktop_control
+    return {"action": action, "accepted": True, **_desktop_window(args["title"])}
+                                                  ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\AI\JARVIS\ComputerAwareness\observer.py", line 394, in _desktop_window
+    raise RuntimeError("Windows did not permit foreground activation")
+RuntimeError: Windows did not permit foreground activation
+\n--- 2026-11-22 21:42:07 ---\nTraceback (most recent call last):
+  File "C:\AI\JARVIS\ComputerAwareness\observer.py", line 576, in do_POST
+    result = desktop_control(request["action"], request["args"])
+  File "C:\AI\JARVIS\ComputerAwareness\observer.py", line 463, in desktop_control
+    raise RuntimeError("Windows rejected Unicode keyboard input")
+RuntimeError: Windows rejected Unicode keyboard input
+\n--- 2026-11-22 21:43:10 ---\nTraceback (most recent call last):
+  File "C:\AI\JARVIS\ComputerAwareness\observer.py", line 576, in do_POST
+    result = desktop_control(request["action"], request["args"])
+  File "C:\AI\JARVIS\ComputerAwareness\observer.py", line 463, in desktop_control
+    raise RuntimeError("Windows rejected Unicode keyboard input")
+RuntimeError: Windows rejected Unicode keyboard input

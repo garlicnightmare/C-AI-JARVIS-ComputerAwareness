@@ -559,19 +559,19 @@ def desktop_control(action, args):
         modifiers = {"CTRL", "ALT", "SHIFT"}
         if any(key not in modifiers for key in normalized[:-1]) or normalized[-1] in modifiers:
             raise ValueError("A key chord must contain modifiers followed by one key")
-        if normalized[-1] not in _CONTROL_KEYS and not (len(normalized[-1]) == 1 and normalized[-1].isalnum()):
+        if normalized[-1] not in _CONTROL_KEYS and not (len(normalized[-1]) == 1 and normalized[-1] in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"):
             raise ValueError("Chord key is not permitted")
         vk = {name: code for name, code in _CONTROL_KEYS.items()}
         for key in normalized:
             code = vk.get(key)
             if code is None:
-                code = ord(key) if len(key) == 1 and key.isalnum() else None
+                code = ord(key) if len(key) == 1 and key in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" else None
             if code is None:
                 raise ValueError("Chord key is not permitted")
         pressed = []
         try:
             for key in normalized:
-                code = vk.get(key, ord(key) if len(key) == 1 and key.isalnum() else None)
+                code = vk.get(key, ord(key) if len(key) == 1 and key in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" else None)
                 user32.keybd_event(code, 0, 0, 0)
                 pressed.append(code)
             return {"action": action, "accepted": True, "keys": normalized}

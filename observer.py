@@ -404,7 +404,12 @@ def _desktop_window(title):
     user32.ShowWindow(hwnd, 9)
     if not user32.SetForegroundWindow(hwnd):
         raise RuntimeError("Windows did not permit foreground activation")
-    return {"window_title": matched_title}
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        if user32.GetForegroundWindow() == hwnd:
+            return {"window_title": matched_title}
+        time.sleep(0.05)
+    raise RuntimeError("Requested window did not become the foreground window")
 
 def _validate_image_geometry(geometry):
     fields = {"image_source_width", "image_source_height", "virtual_left", "virtual_top", "virtual_width", "virtual_height", "image_width", "image_height"}
@@ -436,6 +441,19 @@ def _map_image_point(x, y, geometry):
 def desktop_control(action, args):
     if type(action) is not str or type(args) is not dict:
         raise ValueError("Invalid desktop control request")
+
+    if action != "switch_window" and "window_title" in args:
+        expected_title = args["window_title"]
+        if type(expected_title) is not str or not expected_title.strip() or len(expected_title) > 120:
+            raise ValueError("Invalid target window title")
+        user32 = ctypes.windll.user32
+        foreground = user32.GetForegroundWindow()
+        length = user32.GetWindowTextLengthW(foreground)
+        buffer = ctypes.create_unicode_buffer(max(1, min(length + 1, 513)))
+        user32.GetWindowTextW(foreground, buffer, len(buffer))
+        if expected_title.casefold() not in buffer.value.casefold():
+            raise RuntimeError("Target window is not the foreground application")
+        args = {key: value for key, value in args.items() if key != "window_title"}
 
     user32 = ctypes.windll.user32
 

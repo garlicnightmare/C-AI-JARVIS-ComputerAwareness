@@ -628,7 +628,29 @@ def desktop_control(action, args):
             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
                          | getattr(subprocess, "CREATE_NO_WINDOW", 0)
         )
-        return {"action": action, "accepted": True, "app": app}
+        expected_title = {
+            "notepad": "Notepad",
+            "calculator": "Calculator",
+            "explorer": "File Explorer",
+            "blender": "Blender",
+        }[app]
+        ready_timeout = 25.0 if app == "blender" else 12.0
+        deadline = time.monotonic() + ready_timeout
+        last_not_ready = None
+        while time.monotonic() < deadline:
+            try:
+                activated = _desktop_window(expected_title)
+                return {
+                    "action": action, "accepted": True, "app": app,
+                    "window_title": activated["window_title"],
+                }
+            except ValueError as exc:
+                last_not_ready = exc
+                time.sleep(0.25)
+        raise RuntimeError(
+            "Application process was started, but its window did not become ready: "
+            + app
+        ) from last_not_ready
 
     if action == "switch_window":
         if set(args) != {"title"}:

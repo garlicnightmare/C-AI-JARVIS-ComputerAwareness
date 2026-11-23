@@ -444,6 +444,9 @@ def desktop_control(action, args):
     if type(action) is not str or type(args) is not dict:
         raise ValueError("Invalid desktop control request")
 
+    if action in {"click", "move", "scroll", "type_text", "press_key", "press_chord"} and "window_title" not in args:
+        raise ValueError("Input actions require an explicit foreground window title")
+
     if action != "switch_window" and "window_title" in args:
         expected_title = args["window_title"]
         if type(expected_title) is not str or not expected_title.strip() or len(expected_title) > 120:

@@ -549,6 +549,36 @@ def desktop_control(action, args):
                 sent += 1
         return {"action": action, "accepted": True, "characters": len(value), "events": sent}
 
+    if action == "press_chord":
+        if set(args) != {"keys"} or type(args["keys"]) is not list or not 2 <= len(args["keys"]) <= 4:
+            raise ValueError("Invalid key chord fields")
+        keys = args["keys"]
+        if any(type(key) is not str for key in keys) or len(set(key.upper() for key in keys)) != len(keys):
+            raise ValueError("Invalid key chord members")
+        normalized = [key.upper() for key in keys]
+        modifiers = {"CTRL", "ALT", "SHIFT"}
+        if any(key not in modifiers for key in normalized[:-1]) or normalized[-1] in modifiers:
+            raise ValueError("A key chord must contain modifiers followed by one key")
+        if normalized[-1] not in _CONTROL_KEYS and not (len(normalized[-1]) == 1 and normalized[-1].isalnum()):
+            raise ValueError("Chord key is not permitted")
+        vk = {name: code for name, code in _CONTROL_KEYS.items()}
+        for key in normalized:
+            code = vk.get(key)
+            if code is None:
+                code = ord(key) if len(key) == 1 and key.isalnum() else None
+            if code is None:
+                raise ValueError("Chord key is not permitted")
+        pressed = []
+        try:
+            for key in normalized:
+                code = vk.get(key, ord(key) if len(key) == 1 and key.isalnum() else None)
+                user32.keybd_event(code, 0, 0, 0)
+                pressed.append(code)
+            return {"action": action, "accepted": True, "keys": normalized}
+        finally:
+            for code in reversed(pressed):
+                user32.keybd_event(code, 0, 0x0002, 0)
+
     if action == "press_key":
         if set(args) != {"key"} or type(args["key"]) is not str:
             raise ValueError("Invalid key fields")

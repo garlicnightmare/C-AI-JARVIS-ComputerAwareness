@@ -371,6 +371,8 @@ def _desktop_window(title):
     user32.ShowWindow.restype = wintypes.BOOL
     user32.SetForegroundWindow.argtypes = [wintypes.HWND]
     user32.SetForegroundWindow.restype = wintypes.BOOL
+    user32.GetForegroundWindow.argtypes = []
+    user32.GetForegroundWindow.restype = wintypes.HWND
 
     matches = []
     callback_errors = []
@@ -447,6 +449,12 @@ def desktop_control(action, args):
         if type(expected_title) is not str or not expected_title.strip() or len(expected_title) > 120:
             raise ValueError("Invalid target window title")
         user32 = ctypes.windll.user32
+        user32.GetForegroundWindow.argtypes = []
+        user32.GetForegroundWindow.restype = ctypes.wintypes.HWND
+        user32.GetWindowTextLengthW.argtypes = [ctypes.wintypes.HWND]
+        user32.GetWindowTextLengthW.restype = ctypes.c_int
+        user32.GetWindowTextW.argtypes = [ctypes.wintypes.HWND, ctypes.wintypes.LPWSTR, ctypes.c_int]
+        user32.GetWindowTextW.restype = ctypes.c_int
         foreground = user32.GetForegroundWindow()
         length = user32.GetWindowTextLengthW(foreground)
         buffer = ctypes.create_unicode_buffer(max(1, min(length + 1, 513)))

@@ -272,8 +272,19 @@ def vision_capture(session_token):
 
     # Capture is initiated only by an authenticated, explicit UI request.
     # The image remains in memory; this function never writes a screenshot file.
-    shot = ImageGrab.grab(all_screens=True)
-    shot = shot.convert("RGB")
+    shot = ImageGrab.grab(all_screens=True).convert("RGB")
+    source_width, source_height = shot.size
+    user32 = ctypes.windll.user32
+    desktop_geometry = {
+        "image_source_width": source_width,
+        "image_source_height": source_height,
+        "virtual_left": int(user32.GetSystemMetrics(76)),
+        "virtual_top": int(user32.GetSystemMetrics(77)),
+        "virtual_width": int(user32.GetSystemMetrics(78)),
+        "virtual_height": int(user32.GetSystemMetrics(79)),
+    }
+    if min(source_width, source_height, desktop_geometry["virtual_width"], desktop_geometry["virtual_height"]) <= 0:
+        raise RuntimeError("Invalid Windows virtual-desktop geometry")
     shot.thumbnail((1280, 720), Image.Resampling.LANCZOS)
 
     encoded = None
@@ -302,6 +313,7 @@ def vision_capture(session_token):
         "media_type": "image/jpeg",
         "width": width,
         "height": height,
+        "desktop_geometry": desktop_geometry,
         "captured_at": time.time(),
     }
     del encoded, shot
@@ -394,6 +406,33 @@ def _desktop_window(title):
         raise RuntimeError("Windows did not permit foreground activation")
     return {"window_title": matched_title}
 
+def _validate_image_geometry(geometry):
+    fields = {"image_source_width", "image_source_height", "virtual_left", "virtual_top", "virtual_width", "virtual_height", "image_width", "image_height"}
+    if type(geometry) is not dict or set(geometry) != fields:
+        raise ValueError("Invalid screenshot desktop geometry")
+    for name, value in geometry.items():
+        if type(value) is not int:
+            raise ValueError("Invalid screenshot desktop geometry value")
+    for name in ("image_source_width", "image_source_height", "virtual_width", "virtual_height", "image_width", "image_height"):
+        if not 1 <= geometry[name] <= 32768:
+            raise ValueError("Invalid screenshot desktop geometry dimensions")
+    if abs(geometry["virtual_left"]) > 32768 or abs(geometry["virtual_top"]) > 32768:
+        raise ValueError("Invalid virtual desktop origin")
+
+
+def _map_image_point(x, y, geometry):
+    _validate_image_geometry(geometry)
+    if type(x) is not int or type(y) is not int or not 0 <= x < geometry["image_width"] or not 0 <= y < geometry["image_height"]:
+        raise ValueError("Screenshot coordinate is outside the captured image")
+    px = geometry["virtual_left"] + round(x * geometry["virtual_width"] / geometry["image_width"])
+    py = geometry["virtual_top"] + round(y * geometry["virtual_height"] / geometry["image_height"])
+    if not geometry["virtual_left"] <= px < geometry["virtual_left"] + geometry["virtual_width"]:
+        raise ValueError("Mapped desktop x coordinate is outside the virtual desktop")
+    if not geometry["virtual_top"] <= py < geometry["virtual_top"] + geometry["virtual_height"]:
+        raise ValueError("Mapped desktop y coordinate is outside the virtual desktop")
+    return px, py
+
+
 def desktop_control(action, args):
     if type(action) is not str or type(args) is not dict:
         raise ValueError("Invalid desktop control request")
@@ -401,14 +440,14 @@ def desktop_control(action, args):
     user32 = ctypes.windll.user32
 
     if action == "click":
-        if set(args) - {"x", "y", "button"} or not {"x", "y"} <= set(args):
+        if set(args) - {"x", "y", "button", "desktop_geometry"} or not {"x", "y", "desktop_geometry"} <= set(args):
             raise ValueError("Invalid click fields")
-        x = _control_int(args["x"], 0, user32.GetSystemMetrics(0) - 1, "x")
-        y = _control_int(args["y"], 0, user32.GetSystemMetrics(1) - 1, "y")
+        x, y = _map_image_point(args["x"], args["y"], args["desktop_geometry"])
         button = args.get("button", "left")
         if button not in ("left", "right", "middle"):
             raise ValueError("Invalid mouse button")
-        user32.SetCursorPos(x, y)
+        if not user32.SetCursorPos(x, y):
+            raise RuntimeError("Cursor positioning failed")
         down, up = {
             "left": (0x0002, 0x0004),
             "right": (0x0008, 0x0010),
@@ -419,10 +458,9 @@ def desktop_control(action, args):
         return {"action": action, "accepted": True, "x": x, "y": y, "button": button}
 
     if action == "move":
-        if set(args) != {"x", "y"}:
+        if set(args) != {"x", "y", "desktop_geometry"}:
             raise ValueError("Invalid move fields")
-        x = _control_int(args["x"], 0, user32.GetSystemMetrics(0) - 1, "x")
-        y = _control_int(args["y"], 0, user32.GetSystemMetrics(1) - 1, "y")
+        x, y = _map_image_point(args["x"], args["y"], args["desktop_geometry"])
         if not user32.SetCursorPos(x, y):
             raise RuntimeError("Cursor move failed")
         return {"action": action, "accepted": True, "x": x, "y": y}
